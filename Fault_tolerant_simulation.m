@@ -16,11 +16,11 @@ alpha_srrc=0.5;
 sigmanuc=0.05;
 epsilon=1e-6;
 iterations=10000;
-iteratoins=500;
+iterations=5000;
 
 Rho_R=zeros(iterations,1);
 Rho_AB=zeros(iterations/2,1);
-Rho_AB_SPC=zeros(iterations/2,1);
+Rho_AB_SPC=zeros(iterations/2,1);                                                                             
 Rho_AE=zeros(iterations/2,1);
 Rho_AE_SPC=zeros(iterations/2,1);
 SPC_counter=1;
@@ -29,6 +29,9 @@ SPC_counter=1;
 B_errors=zeros(iterations,1);
 E_errors=zeros(iterations,1);
 SNRo_B=zeros(iterations,1);
+
+cA=zeros(iterations,M);
+cE=zeros(iterations,M);
 
 
 for iter=1:iterations
@@ -56,35 +59,89 @@ for iter=1:iterations
     % Es=((beacon)'*beacon)/Ls;
     delay=50e-9;
     
-    cA=create_rayleigh(M,delay,Tb);
+    cA(iter,:)=create_rayleigh(M,delay,Tb);
     cB=cA;
-    cE=create_rayleigh(M,delay,Tb);
+    cE(iter,:)=create_rayleigh(M,delay,Tb);
     
-    Rho_R(iter)=abs(cA*cE'/(norm(cA,2)*norm(cE,2)))^2;
+%     Rho_R(iter)=abs(cA*cE'/(norm(cA,2)*norm(cE,2)))^2;
 %     continue
       
-    A=exp(-[0:M-1]*Tb/delay/2);
+%     A=exp(-[0:M-1]*Tb/delay/2);
 
     
-    Rho_R(iter)=abs(cA*cE'/(norm(cA,2)*norm(cE,2)))^2;
+    Rho_R(iter)=abs(cA(iter,:)*cE(iter,:)'/(norm(cA(iter,:),2)*norm(cE(iter,:),2)))^2;
+    
+%     Rho_R(iter)=diag(cA*cE')/sqrt(diag(cA*cA')*diag(cE*cE'));
 %     Rho_R_gains(iter)=abs(t_A*t_E'/(norm(t_A,2)*norm(t_E,2)))^2;
     
 %     continue
 % cA=1;
 % cE=1;  
     %%% Baseband
-    cA_bb=conv(cA,pT); %cA_bb=cA_bb(1:L:end);
+    cA_bb=conv(cA(iter,:),pT); %cA_bb=cA_bb(1:L:end);
     cB_bb=cA_bb;
 %     cE=cE.*exp(-1i*2*pi*[0:length(cE)-1]*Ts*fc);
-    cE_bb=conv(cE,pT);% cE_bb=cE_bb(1:L:end);
+    cE_bb=conv(cE(iter,:),pT);% cE_bb=cE_bb(1:L:end);
     
 %     pR=sqrt(L/2)*pR(1:L/2:end);
 
+    %%%%%%%%%%%%
+    %EXPERIMENT%
+    %%%%%%%%%%%%
+ 
+
     %%% Used to compare to the estimate
     cA_true=conv(cA_bb,pR);
-    cA_true=[cA_true;zeros(256-96,1)];
+%     cA_true=[cA_true;zeros(256-96,1)];
     cE_true=conv(cE_bb,pR);
+%     cE_true=[cE_true;zeros(256-96,1)];
+    [~,idx]=max(abs(cA_true));
+%     cA_true=cA_true*exp(-j*angle(cA_true(idx)));
+    [~,idx]=max(abs(cE_true));
+%     cE_true=cE_true*exp(-j*angle(cE_true(idx)));
+    
+    %%% Short CA
+    
+    CA=fftshift(fft(cA_true,length(cA_true)));
+    CE=fftshift(fft(cE_true,length(cE_true)));
+ 
+%     passband=[length(CA)/2-N/2+1:length(CA)/2+N/2];
+    passband=[length(CA)/2-3*N/4+1:length(CA)/2+3*N/4];
+    passband=[length(CA)/2-16+1:length(CA)/2+16];
+    
+    
+    gamma_A=(CA(passband)/norm(CA(passband),2)).';
+%     gamma_B=(CB(passband)/norm(CB(passband),2)).';
+    gamma_E=(CE(passband)/norm(CE(passband),2)).';
+%     Rho_AB(SPC_counter)=abs(gamma_A'*gamma_B)^2;
+    Rho_AE(SPC_counter)=abs(gamma_A*gamma_E')^2;
+    
+    %%%Long CA
+    cA_true=[cA_true;zeros(256-96,1)];
     cE_true=[cE_true;zeros(256-96,1)];
+    CA=fftshift(fft(cA_true,length(cA_true)));
+    CE=fftshift(fft(cE_true,length(cE_true)));
+ 
+    passband=[length(CA)/2-N/2/2+1:length(CA)/2+N/2/2];
+%     passband=[length(CA)/2-3*N/4/2+1:length(CA)/2+3*N/4/2];
+    passband=[length(CA)/2-N/2+1:length(CA)/2+N/2];
+%     passband=1:length(CA);
+%     passband=[length(CA)/2-16+1:length(CA)/2+16];
+    
+    
+    gamma_A=(CA(passband)/norm(CA(passband),2)).';
+%     gamma_B=(CB(passband)/norm(CB(passband),2)).';
+    gamma_E=(CE(passband)/norm(CE(passband),2)).';
+    Rho_AE_SPC(SPC_counter)=abs(gamma_A*gamma_E')^2;
+    
+    
+    SPC_counter=SPC_counter+1;
+    
+    continue
+    %%%%%%%%%%%%%%%%%
+    %END EXPERIMENT %
+    %%%%%%%%%%%%%%%%%
+    
     
     %%%%%%%%temporary%%%%%%%
 %     Rho_R(iter)=abs(cA*cE'/(norm(cA,2)*norm(cE,2)));
@@ -130,9 +187,10 @@ for iter=1:iterations
     %%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%% Timing Alignment %%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%
-    L2=10;
+    L2=4;
     rc=r_cos_p(10*L2,L2,alpha_srrc);
     
+    %%% expand the estimate
 %     cA_L=conv(expander(cA_hat,L),p);
 %     cutoff=(length(p)-1)/2;
     cA_L=conv(expander(cA_hat,L2),rc);
@@ -144,7 +202,6 @@ for iter=1:iterations
 %     cB_L=conv(expander(cB_hat,L),p);
     cB_L=conv(expander(cB_hat,L2),rc);
     cB_L=cB_L(cutoff+1:end-cutoff);
-%     cB_L=conv(expander(c_hat_L,L),p);
     
 %     cE_L=conv(expander(cE_hat,L),p);
     cE_L=conv(expander(cE_hat,L2),rc);
@@ -156,8 +213,7 @@ for iter=1:iterations
 %     p_L=conv(expander(p,L),p); %Expand srrc by L
     p_L=conv(expander(p,L2),rc); %Expand srrc by L
     p_L=p_L(cutoff+1:end-cutoff);
-%     p_L=p;
-%     Nz=(Nc-length(srrc)/2)/2;
+
     z=zeros(1,Nc-length(p_L)+1);
     z(ceil(length(z)/2))=1;
     % long_p=conv(expander(p,L2),p);
@@ -172,20 +228,22 @@ for iter=1:iterations
     
     [~,idx_inc]=max(p_L);
 
-    
     [alpha_A,k_A]=path_candidates(cA_L,M,long_p);
     [alpha_B,k_B]=path_candidates(cB_L,M,long_p);
     [alpha_E,k_E]=path_candidates(cE_L,M,long_p);
-    
+
     %%%shift channels to be centered
     [~,idx]=max(abs(alpha_A));
 %     idx=1;
-    cA_L=circshift(cA_L,length(cA_L)/2-k_A(idx));
-    k_A=mod(k_A-k_A(idx),Nc);
+    shift=length(cA_L)/2-k_A(idx)-1;
+    cA_L=circshift(cA_L,shift);
+%     k_A=mod(k_A-k_A(idx),Nc);
+    k_A=mod(k_A+shift+1,Nc);
     
     [~,idx]=max(abs(alpha_B));
-    cB_L=circshift(cB_L,length(cB_L)/2-k_B(idx));
-    k_B=mod(k_B-k_B(idx),Nc);
+    shift=length(cB_L)/2-k_B(idx)-1;
+    cB_L=circshift(cB_L,shift);
+    k_B=mod(k_B+shift+1,Nc);
     
     [~,idx]=max(abs(alpha_E));
 %     idx=1;
@@ -197,8 +255,8 @@ for iter=1:iterations
     %%% Alice and Bob alignment  %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-    kA_bar=round(sum(k_A.*abs(alpha_A).^2)/sum(k_A));
-    kB_bar=round(sum(k_B.*abs(alpha_B).^2)/sum(k_B));
+    kA_bar=round(k_A*abs(alpha_A.').^2/sum(abs(alpha_A).^2));
+    kB_bar=round(k_B*abs(alpha_B.').^2/sum(abs(alpha_B).^2));
     
     k_D=Nc/2-kA_bar; %Sent to Bob
     
@@ -206,26 +264,37 @@ for iter=1:iterations
     oldmin=1e6;
     ref_p=circshift(long_p,k_ref-1);
     scaling=norm(alpha_B,2);
+%     scaling=1; %remove scaling
+%     for i=1:M
+%         
+%         newmin=norm(abs(alpha_B(i)/scaling)*circshift(long_p,k_B(i)-1) -ref_p ,2)^2;
+%         if(newmin<oldmin)
+%             oldmin=newmin;
+%             alpha_B_sp=alpha_B(i);
+%             k_B_sp=k_B(i);
+%         end
+%     end
+    oldmax=0;
     for i=1:M
-        newmin=norm(abs(alpha_B(i)/scaling)*circshift(long_p,k_B(i)+Nc/2-1) -ref_p ,2)^2;
-        if(newmin<oldmin)
-            oldmin=newmin;
+        temp=max(abs(xcorr(alpha_B(i)*circshift(long_p,k_B(i)-1),ref_p)));
+        if oldmax<temp
+            oldmax=temp;
             alpha_B_sp=alpha_B(i);
             k_B_sp=k_B(i);
         end
     end
-    cB_L=circshift(cB_L,k_B_sp); %align bob to alice
+    
+    
+    
+    cB_L=circshift(cB_L,k_B_sp-Nc/2); %align bob to alice
     
     %%% align Alice and Bob to n=0
     cA_L=circshift(cA_L,-Nc/2+1);
+    k_A=mod(k_A-Nc/2,Nc/L2);
     cB_L=circshift(cB_L,-Nc/2+1);
+    k_B=mod(k_B-Nc/2,Nc/L2);
     
     %%% Decimate
-%     cutoff = (length(p)-1)/(2*L);
-%     cA_hat_dec=decimator(cA_L,L);
-%     cB_hat_dec=decimator(cB_L,L);
-%     cE_hat_dec=decimator(cE_L,L);
-
     cA_hat_dec=decimator(cA_L,L2);
     cB_hat_dec=decimator(cB_L,L2);
     cE_hat_dec=decimator(cE_L,L2);
@@ -260,6 +329,7 @@ for iter=1:iterations
         cB_bar=cB_hat_dec;
         cE_bar=cE_hat_dec;
     end
+    
     %%%%%%%%%%%%%%%%%%%%%%
     %%% Key Generation %%%
     %%%%%%%%%%%%%%%%%%%%%%
@@ -274,7 +344,7 @@ for iter=1:iterations
     gamma_B=(CB(passband)/norm(CB(passband),2)).';
     gamma_E=(CE(passband)/norm(CE(passband),2)).';
 
-    
+% toc    
     %%%%%%%%%%%%%%%%%%%%%%
     %%% Calculate Rhos %%%
     %%%%%%%%%%%%%%%%%%%%%%
@@ -292,7 +362,7 @@ for iter=1:iterations
         SPC_counter=SPC_counter+1; %%%%%%TEMPORARY, later used below for Rho snr%%%%%%%%%%%%%%
     end
 %     Rho_R(iter)=abs(cA_gains*cE_gains')^2;%/(norm(cA_gains,2)*norm(cE_gains,2)))^2;
-    Rho_R(iter)=abs(cA*cE'/(norm(cA,2)*norm(cE,2)))^2;
+%     Rho_R(iter)=abs(cA*cE'/(norm(cA,2)*norm(cE,2)))^2;
 
     continue %%%%%%%%%%%%TEMPORARY %%%%%%%%%%%%%%
 
@@ -376,6 +446,9 @@ for iter=1:iterations
     E_errors(iter)=nnz(differences);
     
 end
+
+
+Rho_R=abs(diag(cA*cE')./sqrt(diag(cA*cA').*diag(cE*cE'))).^2;
 
 %Plot CDF of each rho
 figure(1);
