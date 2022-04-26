@@ -1,4 +1,4 @@
-function [chan] = create_rayleigh(M_paths,delay,Tb)
+function [chan] = create_rayleigh(M_paths,delay,Tb,L)
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
     cA_gains=zeros(1,M_paths);
@@ -17,7 +17,7 @@ function [chan] = create_rayleigh(M_paths,delay,Tb)
     cA_gains=sqrt(A/2).*(randn(1,M_paths)+1i*randn(1,M_paths));
 %     cE_gains=sqrt(1/2)*(randn(1,M)+1i*randn(1,M));
        
-
+    cA_gains=expander(cA_gains,L);
 
     
 %     chan=cA_gains.*A;

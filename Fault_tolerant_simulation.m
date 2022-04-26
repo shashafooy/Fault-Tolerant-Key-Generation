@@ -16,7 +16,9 @@ alpha_srrc=0.5;
 sigmanuc=0.05;
 epsilon=1e-6;
 iterations=10000;
-iterations=5000;
+N=64;
+L=4;
+% iterations=500;
 
 Rho_R=zeros(iterations,1);
 Rho_AB=zeros(iterations/2,1);
@@ -25,13 +27,17 @@ Rho_AE=zeros(iterations/2,1);
 Rho_AE_SPC=zeros(iterations/2,1);
 SPC_counter=1;
 
+store_gamma_A=zeros(iterations/2,N);
+store_gamma_B=zeros(iterations/2,N);
+store_gamma_E=zeros(iterations/2,N);
+
 % SNRo_B=zeros(iterations,1);
 B_errors=zeros(iterations,1);
 E_errors=zeros(iterations,1);
 SNRo_B=zeros(iterations,1);
 
-cA=zeros(iterations,M);
-cE=zeros(iterations,M);
+cA=zeros(iterations,M*L);
+cE=zeros(iterations,M*L);
 
 
 for iter=1:iterations
@@ -40,8 +46,7 @@ for iter=1:iterations
     pR=conj(pT(end:-1:1)); %more accurate in cases where Pr is slightly different
     
     %ZC sequence
-    N=64;
-    L=4;
+    
     pilot=CycPilot(N-1);
     s=pilot;
     ss=[s;s;s;s;s];
@@ -59,9 +64,9 @@ for iter=1:iterations
     % Es=((beacon)'*beacon)/Ls;
     delay=50e-9;
     
-    cA(iter,:)=create_rayleigh(M,delay,Tb);
+    cA(iter,:)=create_rayleigh(M,delay,Tb,L);
     cB=cA;
-    cE(iter,:)=create_rayleigh(M,delay,Tb);
+    cE(iter,:)=create_rayleigh(M,delay,Tb,L);
     
 %     Rho_R(iter)=abs(cA*cE'/(norm(cA,2)*norm(cE,2)))^2;
 %     continue
@@ -88,56 +93,56 @@ for iter=1:iterations
     %%%%%%%%%%%%
     %EXPERIMENT%
     %%%%%%%%%%%%
- 
-
-    %%% Used to compare to the estimate
-    cA_true=conv(cA_bb,pR);
-%     cA_true=[cA_true;zeros(256-96,1)];
-    cE_true=conv(cE_bb,pR);
-%     cE_true=[cE_true;zeros(256-96,1)];
-    [~,idx]=max(abs(cA_true));
-%     cA_true=cA_true*exp(-j*angle(cA_true(idx)));
-    [~,idx]=max(abs(cE_true));
-%     cE_true=cE_true*exp(-j*angle(cE_true(idx)));
-    
-    %%% Short CA
-    
-    CA=fftshift(fft(cA_true,length(cA_true)));
-    CE=fftshift(fft(cE_true,length(cE_true)));
- 
-%     passband=[length(CA)/2-N/2+1:length(CA)/2+N/2];
-    passband=[length(CA)/2-3*N/4+1:length(CA)/2+3*N/4];
-    passband=[length(CA)/2-16+1:length(CA)/2+16];
-    
-    
-    gamma_A=(CA(passband)/norm(CA(passband),2)).';
-%     gamma_B=(CB(passband)/norm(CB(passband),2)).';
-    gamma_E=(CE(passband)/norm(CE(passband),2)).';
-%     Rho_AB(SPC_counter)=abs(gamma_A'*gamma_B)^2;
-    Rho_AE(SPC_counter)=abs(gamma_A*gamma_E')^2;
-    
-    %%%Long CA
-    cA_true=[cA_true;zeros(256-96,1)];
-    cE_true=[cE_true;zeros(256-96,1)];
-    CA=fftshift(fft(cA_true,length(cA_true)));
-    CE=fftshift(fft(cE_true,length(cE_true)));
- 
-    passband=[length(CA)/2-N/2/2+1:length(CA)/2+N/2/2];
-%     passband=[length(CA)/2-3*N/4/2+1:length(CA)/2+3*N/4/2];
-    passband=[length(CA)/2-N/2+1:length(CA)/2+N/2];
-%     passband=1:length(CA);
+%  
+% 
+%     %%% Used to compare to the estimate
+%     cA_true=conv(cA_bb,pR);
+% %     cA_true=[cA_true;zeros(256-96,1)];
+%     cE_true=conv(cE_bb,pR);
+% %     cE_true=[cE_true;zeros(256-96,1)];
+%     [~,idx]=max(abs(cA_true));
+% %     cA_true=cA_true*exp(-j*angle(cA_true(idx)));
+%     [~,idx]=max(abs(cE_true));
+% %     cE_true=cE_true*exp(-j*angle(cE_true(idx)));
+%     
+%     %%% Short CA
+%     
+%     CA=fftshift(fft(cA_true,length(cA_true)));
+%     CE=fftshift(fft(cE_true,length(cE_true)));
+%  
+% %     passband=[length(CA)/2-N/2+1:length(CA)/2+N/2];
+%     passband=[length(CA)/2-3*N/4+1:length(CA)/2+3*N/4];
 %     passband=[length(CA)/2-16+1:length(CA)/2+16];
-    
-    
-    gamma_A=(CA(passband)/norm(CA(passband),2)).';
-%     gamma_B=(CB(passband)/norm(CB(passband),2)).';
-    gamma_E=(CE(passband)/norm(CE(passband),2)).';
-    Rho_AE_SPC(SPC_counter)=abs(gamma_A*gamma_E')^2;
-    
-    
-    SPC_counter=SPC_counter+1;
-    
-    continue
+%     
+%     
+%     gamma_A=(CA(passband)/norm(CA(passband),2)).';
+% %     gamma_B=(CB(passband)/norm(CB(passband),2)).';
+%     gamma_E=(CE(passband)/norm(CE(passband),2)).';
+% %     Rho_AB(SPC_counter)=abs(gamma_A'*gamma_B)^2;
+% %     Rho_AE(SPC_counter)=abs(gamma_A*gamma_E')^2;
+%     
+%     %%%Long CA
+%     cA_true=[cA_true;zeros(256-96,1)];
+%     cE_true=[cE_true;zeros(256-96,1)];
+%     CA=fftshift(fft(cA_true,length(cA_true)));
+%     CE=fftshift(fft(cE_true,length(cE_true)));
+%  
+% %     passband=[length(CA)/2-N/2/2+1:length(CA)/2+N/2/2];
+% %     passband=[length(CA)/2-3*N/4/2+1:length(CA)/2+3*N/4/2];
+%     passband=[length(CA)/2-N/2+1:length(CA)/2+N/2];
+% %     passband=1:length(CA);
+% %     passband=[length(CA)/2-16+1:length(CA)/2+16];
+%     
+%     
+%     gamma_A=(CA(passband)/norm(CA(passband),2)).';
+% %     gamma_B=(CB(passband)/norm(CB(passband),2)).';
+%     gamma_E=(CE(passband)/norm(CE(passband),2)).';
+% %     Rho_AE_SPC(SPC_counter)=abs(gamma_A*gamma_E')^2;
+%     
+%     
+% %     SPC_counter=SPC_counter+1;
+%     
+% %     continue
     %%%%%%%%%%%%%%%%%
     %END EXPERIMENT %
     %%%%%%%%%%%%%%%%%
@@ -154,7 +159,8 @@ for iter=1:iterations
     %%%% Transmit ZC over Rayleigh channel %%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %sigma = power/snr
-    yA=conv(beacon,cA_bb);
+    tA=conv(beacon,pR);
+    yA=conv(tA,cA(iter,:));
     vA=sigmanuc*(randn(2*length(yA),1)+1i*randn(2*length(yA),1))/sqrt(2); %noise
     vA=conv(pT,vA);
     yA=yA+vA(1:2:2*length(yA));
@@ -164,7 +170,8 @@ for iter=1:iterations
     vB=conv(pT,vB);
     yB=yB+vB(1:2:2*length(yB));
     
-    yE=conv(beacon,cE_bb);
+    tE=conv(beacon,pR);
+    yE=conv(tE,cE(iter,:));
     vE=sigmanuc*(randn(2*length(yE),1)+1i*randn(2*length(yE),1))/sqrt(2); %noise
     vE=conv(pT,vE);
     yE=yE+vE(1:2:2*length(yE));
@@ -353,17 +360,25 @@ for iter=1:iterations
 
         Rho_AB_SPC(SPC_counter)=abs(gamma_A'*gamma_B)^2;
         Rho_AE_SPC(SPC_counter)=abs(gamma_A'*gamma_E)^2;
-
+        store_gamma_A(SPC_counter,:)=gamma_A;
+        store_gamma_B(SPC_counter,:)=gamma_B;
+        store_gamma_E(SPC_counter,:)=gamma_E;
         
     else %no SPC
         Rho_AB(SPC_counter)=abs(gamma_A'*gamma_B)^2;
         Rho_AE(SPC_counter)=abs(gamma_A'*gamma_E)^2;
-        
+        if Rho_AE(SPC_counter) > 0.9
+            keyboard
+        end
         SPC_counter=SPC_counter+1; %%%%%%TEMPORARY, later used below for Rho snr%%%%%%%%%%%%%%
     end
 %     Rho_R(iter)=abs(cA_gains*cE_gains')^2;%/(norm(cA_gains,2)*norm(cE_gains,2)))^2;
 %     Rho_R(iter)=abs(cA*cE'/(norm(cA,2)*norm(cE,2)))^2;
+    
 
+    
+
+    
     continue %%%%%%%%%%%%TEMPORARY %%%%%%%%%%%%%%
 
     
@@ -478,6 +493,7 @@ title('Key Correlation');
 xlabel('\rho')
 ylabel('F(\rho)')
 
+save('keys.mat','store_gamma_A','store_gamma_B','store_gamma_E');
 
 % tx_power=x(k,:)*x(k,:)';
 % temp_sigma2_w=w(k,:)*w(k,:)';
